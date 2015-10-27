@@ -15,7 +15,13 @@ pub struct PartialHelper;
 impl HelperDef for IncludeHelper {
     fn call(&self, c: &Context, h: &Helper, r: &Registry, rc: &mut RenderContext) -> Result<(), RenderError> {
         let template = match h.params().get(0) {
-            Some(ref t) => r.get_template(t),
+            Some(ref t) => {
+                if rc.current_template == Some((*t).to_string()) {
+                    return Err(render_error("Cannot include self in >"));
+                } else {
+                    r.get_template(t)
+                }
+            }
             None => return Err(render_error("Param not found for helper")),
         };
 
@@ -145,5 +151,19 @@ mod test {
 
         let r0 = handlebars.render("t0", &map);
         assert_eq!(r0.ok().unwrap(), "<h1><p>hello</p><p>world</p></h1>".to_string());
+    }
+
+    #[test]
+    fn test_include_self() {
+        let t0 = Template::compile("<h1>{{> t0}}</h1>".to_string()).ok().unwrap();
+
+        let mut handlebars = Registry::new();
+        handlebars.register_template("t0", t0);
+
+        let map: BTreeMap<String, String> = BTreeMap::new();
+
+        let r0 = handlebars.render("t0", &map);
+        assert!(r0.is_err());
+
     }
 }
